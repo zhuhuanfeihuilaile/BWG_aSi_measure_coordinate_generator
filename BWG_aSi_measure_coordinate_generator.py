@@ -6,67 +6,63 @@ import io
 
 st.set_page_config(page_title="6英寸晶圆坐标校准与生成", page_icon="🎯", layout="centered")
 
-st.title("🎯 6英寸晶圆全盘测试坐标校准工具")
-st.markdown("请输入实测点坐标（支持 3 到 6 个点），系统将自动进行最小二乘法拟合，并生成全盘 Die 坐标 Excel 表格。")
+st.title("🎯 6英寸晶圆全盘测试坐标校准工具（通用版）")
+st.markdown("请输入实测点的**网格索引 (i, j)** 以及对应的**实测物理坐标 (X, Y)**（支持 3 到 6 个点）。")
 
-# 创建输入表单
-st.subheader("📝 输入实测点坐标 (cm)")
-col1, col2, col3 = st.columns([1, 1, 1])
+st.subheader("📝 输入网格索引与实测坐标")
 
-with col1:
-    st.markdown("**点位名称**")
-with col2:
-    st.markdown("**实测 X 坐标**")
-with col3:
-    st.markdown("**实测 Y 坐标**")
-
-# 默认点位及网格映射
-default_points = [
-    ("P1 (网格 1,0)", 1.80687, -1.37350),
-    ("P2 (网格 -1,0)", -2.59025, -1.40250),
-    ("P3 (网格 0,-1)", -0.37825, -3.58650),
-    ("P4 (网格 0,0)", -0.39175, -1.38775),
-    ("P5 (网格 2,1)", 3.99163, 0.83912),
-    ("P6 (网格 -2,3)", -4.83012, 5.18000)
+# 默认提供 6 行，用户可以自由修改每行的网格索引和坐标
+default_data = [
+    {"name": "点 1", "i": 1, "j": 0, "x": 1.80687, "y": -1.37350},
+    {"name": "点 2", "i": -1, "j": 0, "x": -2.59025, "y": -1.40250},
+    {"name": "点 3", "i": 0, "j": -1, "x": -0.37825, "y": -3.58650},
+    {"name": "点 4", "i": 0, "j": 0, "x": -0.39175, "y": -1.38775},
+    {"name": "点 5", "i": 2, "j": 1, "x": 3.99163, "y": 0.83912},
+    {"name": "点 6", "i": -2, "j": 3, "x": -4.83012, "y": 5.18000}
 ]
 
-indices_map = {
-    0: (1, 0),
-    1: (-1, 0),
-    2: (0, -1),
-    3: (0, 0),
-    4: (2, 1),
-    5: (-2, 3)
-}
+# 表头
+col_h1, col_h2, col_h3, col_h4, col_h5 = st.columns([1, 1, 1, 1.2, 1.2])
+with col_h1: st.markdown("**点位**")
+with col_h2: st.markdown("**网格 X (i)**")
+with col_h3: st.markdown("**网格 Y (j)**")
+with col_h4: st.markdown("**实测 X (cm)**")
+with col_h5: st.markdown("**实测 Y (cm)**")
 
 user_points = []
-input_x, input_y = [], []
 
-for i, (p_name, def_x, def_y) in enumerate(default_points):
-    c1, c2, c3 = st.columns([1, 1, 1])
+for idx, def_val in enumerate(default_data):
+    c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1.2, 1.2])
     with c1:
-        st.text(p_name)
+        st.text(def_val["name"])
     with c2:
-        val_x = st.text_input(f"X_{i}", value=str(def_x), label_visibility="collapsed")
+        i_val = st.text_input(f"i_{idx}", value=str(def_val["i"]), label_visibility="collapsed")
     with c3:
-        val_y = st.text_input(f"Y_{i}", value=str(def_y), label_visibility="collapsed")
+        j_val = st.text_input(f"j_{idx}", value=str(def_val["j"]), label_visibility="collapsed")
+    with c4:
+        x_val = st.text_input(f"x_{idx}", value=str(def_val["x"]), label_visibility="collapsed")
+    with c5:
+        y_val = st.text_input(f"y_{idx}", value=str(def_val["y"]), label_visibility="collapsed")
 
-    # 允许过滤掉没填的行（实现灵活输入 3~6 个点）
-    if val_x.strip() and val_y.strip():
-        user_points.append({
-            'index': i,
-            'grid': indices_map[i],
-            'x': float(val_x),
-            'y': float(val_y)
-        })
+    # 只要这行填了实测坐标，就将其纳入计算
+    if x_val.strip() and y_val.strip() and i_val.strip() and j_val.strip():
+        try:
+            user_points.append({
+                'i': float(i_val),
+                'j': float(j_val),
+                'x': float(x_val),
+                'y': float(y_val)
+            })
+        except ValueError:
+            pass
 
 if st.button("🚀 开始计算并生成 Excel 坐标表", type="primary", use_container_width=True):
     if len(user_points) < 3:
-        st.error("❌ 至少需要输入 3 个有效的实测点才能进行网格拟合！")
+        st.error("❌ 至少需要完整填写 3 个有效的点（包含网格索引和实测坐标）才能进行拟合！")
     else:
         try:
-            i_arr = np.array([p['grid'][0] for p in user_points])
-            j_arr = np.array([p['grid'][1] for p in user_points])
+            i_arr = np.array([p['i'] for p in user_points])
+            j_arr = np.array([p['j'] for p in user_points])
             x_meas = np.array([p['x'] for p in user_points])
             y_meas = np.array([p['y'] for p in user_points])
 
@@ -78,7 +74,7 @@ if st.button("🚀 开始计算并生成 Excel 坐标表", type="primary", use_c
                 return np.concatenate([x, y])
 
 
-            # 初始猜测值使用第 4 个点或第一个点
+            # 初始猜测值
             p0 = [x_meas[0], y_meas[0], 2.2, 0.0]
             popt, _ = curve_fit(wafer_model, (i_arr, j_arr), np.concatenate([x_meas, y_meas]), p0=p0)
 
@@ -103,7 +99,7 @@ if st.button("🚀 开始计算并生成 Excel 坐标表", type="primary", use_c
                         })
             df_final = pd.DataFrame(coords_final)
 
-            # 显示计算结果看板
+            # 展示计算结果看板
             st.success("✨ 拟合计算成功！")
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("拟合周期 (Pitch)", f"{fitted_pitch:.4f} cm")
@@ -120,7 +116,7 @@ if st.button("🚀 开始计算并生成 Excel 坐标表", type="primary", use_c
             st.download_button(
                 label="📥 点击下载生成的 Excel 坐标表",
                 data=excel_data,
-                file_name="wafer_coordinates_web_calibrated.xlsx",
+                file_name="wafer_coordinates_custom_grid.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
